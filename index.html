@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Διαύγεια Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Karla:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e1117;--surface:#161b24;--surface2:#1e2533;--border:#2a3142;--text:#e8eaf0;--muted:#7880a0;--accent:#e8c97a;--blue:#5b8dee;--green:#3ec97a;--red:#e8564a;--orange:#e8a03a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Karla',sans-serif;font-size:14px;min-height:100vh;padding-bottom:30px}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar h1{font-family:'Playfair Display',serif;font-size:18px;color:var(--accent)}
+.topbar-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.main{padding:14px}
+
+/* SEARCH PANEL */
+.search-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+.sp-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;font-weight:700}
+.keywords-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.kw-chip{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:5px 11px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Karla',sans-serif;transition:all .2s}
+.kw-chip.active{background:var(--accent);color:#0e1117;border-color:var(--accent)}
+.kw-chip.region{background:rgba(91,141,238,.08);border-color:rgba(91,141,238,.2);color:var(--blue)}
+.kw-chip.region.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.divider{font-size:10px;color:var(--muted);width:100%;padding:4px 0;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.days-row{display:flex;gap:6px;margin-bottom:12px;align-items:center}
+.days-row label{font-size:11px;color:var(--muted);font-weight:600}
+.days-select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:7px;font-family:'Karla',sans-serif;font-size:12px;-webkit-appearance:none}
+.btn-search{width:100%;background:var(--accent);color:#0e1117;border:none;padding:11px;border-radius:8px;font-family:'Karla',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:opacity .2s}
+.btn-search:disabled{opacity:.5;cursor:not-allowed}
+
+/* RESULTS */
+.results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.results-count{font-size:12px;color:var(--muted)}
+.results-count span{color:var(--accent);font-weight:700}
+.last-search{font-size:10px;color:var(--muted)}
+
+.result-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:8px;transition:border-color .2s}
+.result-card:hover{border-color:rgba(232,201,122,.3)}
+.rc-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
+.rc-type{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;flex-shrink:0;margin-top:2px}
+.type-tender{background:rgba(232,201,122,.12);color:var(--accent)}
+.type-contract{background:rgba(62,201,122,.12);color:var(--green)}
+.type-decision{background:rgba(91,141,238,.12);color:var(--blue)}
+.type-other{background:rgba(120,128,160,.12);color:var(--muted)}
+.rc-title{font-weight:700;font-size:13px;line-height:1.4;flex:1}
+.rc-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.rc-org{font-size:11px;color:var(--muted)}
+.rc-date{font-size:10px;background:var(--surface2);padding:1px 7px;border-radius:20px;color:var(--accent);font-weight:600}
+.rc-region{font-size:10px;padding:1px 7px;border-radius:20px;background:rgba(91,141,238,.1);color:var(--blue);font-weight:600}
+.rc-amount{font-size:12px;color:var(--green);font-weight:700}
+.rc-link{display:inline-block;margin-top:6px;font-size:11px;color:var(--blue);text-decoration:none;font-weight:600}
+.rc-link:hover{text-decoration:underline}
+.rc-excerpt{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;font-style:italic}
+.match-badge{font-size:10px;padding:1px 7px;border-radius:20px;background:rgba(232,201,122,.1);color:var(--accent);font-weight:600}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-state .icon{font-size:40px;margin-bottom:10px}
+.empty-state p{font-size:13px}
+
+.loading{text-align:center;padding:30px;color:var(--muted)}
+.spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.error-box{background:rgba(232,86,74,.08);border:1px solid rgba(232,86,74,.2);border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:var(--red)}
+
+.toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 18px;font-size:12px;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+
+select option{background:#1a2030}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>🔍 Διαύγεια Scanner</h1>
+    <div class="topbar-sub">Διαγωνισμοί · Αναθέσεις · Θράκη</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="main">
+
+  <!-- SEARCH PANEL -->
+  <div class="search-panel">
+    <div class="sp-title">📦 Κατηγορίες</div>
+    <div class="keywords-grid" id="kw-grid">
+      <!-- filled by JS -->
+    </div>
+
+    <div class="sp-title" style="margin-top:12px">📍 Περιοχή</div>
+    <div class="keywords-grid" id="region-grid">
+      <!-- filled by JS -->
+    </div>
+
+    <div class="days-row" style="margin-top:12px">
+      <label>Περίοδος:</label>
+      <select class="days-select" id="days-select">
+        <option value="7">7 μέρες</option>
+        <option value="14">14 μέρες</option>
+        <option value="30" selected>30 μέρες</option>
+        <option value="60">60 μέρες</option>
+        <option value="90">90 μέρες</option>
+      </select>
+    </div>
+
+    <button class="btn-search" id="btn-search" onclick="doSearch()">🔍 Αναζήτηση</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results-area">
+    <div class="empty-state">
+      <div class="icon">🏛</div>
+      <p>Επίλεξε κατηγορίες και πάτα Αναζήτηση</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── KEYWORDS ──────────────────────────────────────────────
+const KEYWORDS = [
+  {id:'metafores', label:'🚛 Μεταφορές', terms:['μεταφορά','μεταφορές','μεταφορικό','logistics','διαμεταφορά','αποστολή','φορτηγό']},
+  {id:'samothraki', label:'⛴ Σαμοθράκη', terms:['Σαμοθράκη','δρομολόγιο Σαμοθράκης','ακτοπλοϊκό Σαμοθράκης']},
+  {id:'kylikeio', label:'☕ Κυλικείο', terms:['κυλικείο','κυλικεία','καφετέρια','snack bar']},
+  {id:'anapsiktirio', label:'🥤 Αναψυκτήριο', terms:['αναψυκτήριο','αναψυκτήρια','κυλικείο-αναψυκτήριο']},
+  {id:'kantina', label:'🍔 Καντίνα', terms:['καντίνα','καντίνες','τροχήλατο','food truck']},
+  {id:'parking', label:'🅿️ Πάρκινγκ', terms:['πάρκινγκ','στάθμευση','χώρος στάθμευσης','parking']},
+  {id:'estiatoria', label:'🍽 Εστίαση', terms:['εστίαση','εστιατόριο','τροφοδοσία','catering']},
+  {id:'ferry', label:'🚢 Πλοία', terms:['πλοίο','ακτοπλοϊκό','δρομολόγιο','ferry','επιβατηγό']},
+  {id:'apothiki', label:'📦 Αποθήκευση', terms:['αποθήκευση','αποθήκη','αποθηκευτικός χώρος','warehouse']},
+  {id:'katharismos', label:'🧹 Καθαρισμός', terms:['καθαρισμός','καθαριότητα','απολύμανση']},
+];
+
+const REGIONS = [
+  {id:'alex', label:'Αλεξανδρούπολη', terms:['Αλεξανδρούπολη','Αλεξανδρούπολης']},
+  {id:'evros', label:'Έβρος', terms:['Έβρος','Έβρου','ΠΕ Έβρου','Περιφερειακή Ενότητα Έβρου']},
+  {id:'thraki', label:'Θράκη', terms:['Θράκη','Ανατολική Μακεδονία','ΠΑΜΘ']},
+  {id:'samothraki_r', label:'Σαμοθράκη', terms:['Σαμοθράκη','Δήμος Σαμοθράκης']},
+  {id:'didymoteicho', label:'Διδυμότειχο', terms:['Διδυμότειχο','Διδυμοτείχου']},
+  {id:'orestiada', label:'Ορεστιάδα', terms:['Ορεστιάδα','Ορεστιάδας']},
+];
+
+let activeKeywords = new Set(['metafores','samothraki']);
+let activeRegions  = new Set(['alex','evros','thraki','samothraki_r']);
+
+// ── RENDER CHIPS ──────────────────────────────────────────
+function renderChips(){
+  document.getElementById('kw-grid').innerHTML = KEYWORDS.map(k=>`
+    <button class="kw-chip${activeKeywords.has(k.id)?' active':''}" onclick="toggleKw('${k.id}')">${k.label}</button>
+  `).join('');
+  document.getElementById('region-grid').innerHTML = REGIONS.map(r=>`
+    <button class="kw-chip region${activeRegions.has(r.id)?' active':''}" onclick="toggleRegion('${r.id}')">${r.label}</button>
+  `).join('');
+}
+
+function toggleKw(id){
+  if(activeKeywords.has(id)) activeKeywords.delete(id);
+  else activeKeywords.add(id);
+  renderChips();
+}
+
+function toggleRegion(id){
+  if(activeRegions.has(id)) activeRegions.delete(id);
+  else activeRegions.add(id);
+  renderChips();
+}
+
+// ── SEARCH ────────────────────────────────────────────────
+async function doSearch(){
+  if(activeKeywords.size===0){showToast('⚠️ Επίλεξε τουλάχιστον μία κατηγορία');return;}
+
+  const btn=document.getElementById('btn-search');
+  btn.disabled=true;btn.textContent='⏳ Αναζήτηση...';
+
+  const area=document.getElementById('results-area');
+  area.innerHTML=`<div class="loading"><div class="spinner"></div><div>Αναζήτηση στη Διαύγεια...</div></div>`;
+
+  const days=Number(document.getElementById('days-select').value);
+  const fromDate=new Date();fromDate.setDate(fromDate.getDate()-days);
+  const fromStr=fromDate.toISOString().split('T')[0];
+
+  // Build search queries — combine keyword terms
+  const kwTerms=[];
+  activeKeywords.forEach(id=>{
+    const kw=KEYWORDS.find(k=>k.id===id);
+    if(kw) kwTerms.push(...kw.terms);
+  });
+
+  const regionTerms=[];
+  activeRegions.forEach(id=>{
+    const r=REGIONS.find(r=>r.id===id);
+    if(r) regionTerms.push(...r.terms);
+  });
+
+  // We'll run multiple queries and combine
+  const allResults=[];
+  const seen=new Set();
+
+  // Query per keyword (top 3 terms each)
+  const queries=[];
+  activeKeywords.forEach(id=>{
+    const kw=KEYWORDS.find(k=>k.id===id);
+    if(kw) queries.push({label:kw.label, terms:kw.terms.slice(0,2)});
+  });
+
+  try {
+    for(const q of queries){
+      for(const term of q.terms){
+        const url=`https://diavgeia.gov.gr/luminapi/api/search?q=${encodeURIComponent(term)}&from_date=${fromStr}&size=20&sort=recent`;
+        try{
+          const res=await fetch(url,{headers:{'Accept':'application/json'}});
+          if(!res.ok) continue;
+          const data=await res.json();
+          if(data.decisions&&data.decisions.length){
+            data.decisions.forEach(d=>{
+              if(seen.has(d.ada))return;
+              // Region filter
+              const textToCheck=(d.subject||'')+(d.organizationLabel||'')+(d.unitLabel||'');
+              if(activeRegions.size>0){
+                const matchesRegion=regionTerms.some(rt=>textToCheck.toLowerCase().includes(rt.toLowerCase()));
+                if(!matchesRegion) return;
+              }
+              seen.add(d.ada);
+              allResults.push({...d, matchedKw:q.label});
+            });
+          }
+        }catch(e){/* skip failed queries */}
+      }
+    }
+
+    // Sort by date desc
+    allResults.sort((a,b)=>(b.issueDate||'').localeCompare(a.issueDate||''));
+
+    renderResults(allResults, days);
+  } catch(e){
+    area.innerHTML=`<div class="error-box">❌ Σφάλμα σύνδεσης με τη Διαύγεια. Δοκίμασε ξανά.</div>`;
+  }
+
+  btn.disabled=false;btn.textContent='🔍 Αναζήτηση';
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────
+function renderResults(results, days){
+  const area=document.getElementById('results-area');
+  const now=new Date().toLocaleString('el-GR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+
+  if(!results.length){
+    area.innerHTML=`
+      <div class="results-header">
+        <div class="results-count">Βρέθηκαν <span>0</span> αποτελέσματα</div>
+        <div class="last-search">🕐 ${now}</div>
+      </div>
+      <div class="empty-state">
+        <div class="icon">🎉</div>
+        <p>Δεν βρέθηκε τίποτα για τα τελευταία ${days} μέρες<br>με τα επιλεγμένα κριτήρια</p>
+      </div>`;
+    return;
+  }
+
+  const cards=results.map(d=>{
+    const type=getType(d.decisionTypeLabel||'');
+    const amount=extractAmount(d.subject||'');
+    const dateStr=formatDate(d.issueDate||'');
+    const subject=(d.subject||'').replace(/\s+/g,' ').trim();
+    const shortSubject=subject.length>150?subject.slice(0,150)+'…':subject;
+    const ada=d.ada||'';
+    const org=d.organizationLabel||d.unitLabel||'';
+    const link=`https://diavgeia.gov.gr/decision/view/${ada}`;
+
+    return`<div class="result-card">
+      <div class="rc-top">
+        <span class="rc-type ${type.cls}">${type.label}</span>
+        <span class="rc-title">${shortSubject}</span>
+      </div>
+      <div class="rc-meta">
+        ${org?`<span class="rc-org">🏛 ${org.slice(0,60)}</span>`:''}
+        ${dateStr?`<span class="rc-date">📅 ${dateStr}</span>`:''}
+        <span class="match-badge">${d.matchedKw||''}</span>
+      </div>
+      ${amount?`<div class="rc-amount">💰 ${amount}</div>`:''}
+      <a class="rc-link" href="${link}" target="_blank">🔗 Άνοιγμα στη Διαύγεια →</a>
+    </div>`;
+  }).join('');
+
+  area.innerHTML=`
+    <div class="results-header">
+      <div class="results-count">Βρέθηκαν <span>${results.length}</span> αποτελέσματα</div>
+      <div class="last-search">🕐 ${now}</div>
+    </div>
+    ${cards}`;
+}
+
+// ── HELPERS ───────────────────────────────────────────────
+function getType(label){
+  const l=label.toLowerCase();
+  if(l.includes('διακήρυξ')||l.includes('διαγωνισμ')||l.includes('προκήρυξ'))
+    return{cls:'type-tender',label:'📢 Διαγωνισμός'};
+  if(l.includes('σύμβαση')||l.includes('ανάθεσ'))
+    return{cls:'type-contract',label:'📝 Ανάθεση'};
+  if(l.includes('απόφασ'))
+    return{cls:'type-decision',label:'⚖️ Απόφαση'};
+  return{cls:'type-other',label:'📄 Έγγραφο'};
+}
+
+function formatDate(d){
+  if(!d)return'';
+  try{
+    const dt=new Date(d);
+    return dt.toLocaleDateString('el-GR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  }catch(e){return d.slice(0,10);}
+}
+
+function extractAmount(text){
+  const m=text.match(/(\d[\d.,]+)\s*€|€\s*(\d[\d.,]+)|(\d[\d.,]+)\s*ευρώ/i);
+  if(m){
+    const val=m[1]||m[2]||m[3];
+    return val+'€';
+  }
+  return null;
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ── INIT ──────────────────────────────────────────────────
+renderChips();
+</script>
+</body>
+</html>
