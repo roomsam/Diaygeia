@@ -205,48 +205,53 @@ async function doSearch(){
   activeKeywords.forEach(id=>{
     const kw=KEYWORDS.find(k=>k.id===id);
     if(!kw) return;
-    // Search keyword alone (no strict region filter - Diavgeia has org info separately)
+    // 1. Keyword μόνο
     kw.terms.slice(0,2).forEach(term=>{
       queries.push({label:kw.label, term});
     });
-    // Also search keyword + region combined
+    // 2. Keyword + κάθε περιοχή ξεχωριστά
     if(regionTerms.length>0){
-      regionTerms.slice(0,2).forEach(rt=>{
+      regionTerms.slice(0,3).forEach(rt=>{
         queries.push({label:kw.label, term:`${kw.terms[0]} ${rt}`});
       });
     }
   });
+  // 3. Περιοχές μόνες τους για να πιάσουμε τοπικούς φορείς
+  regionTerms.slice(0,2).forEach(rt=>{
+    queries.push({label:'📍 Τοπικό', term:rt});
+  });
 
   try {
     for(const q of queries){
-      const url=`https://diavgeia.gov.gr/luminapi/api/search?q=${encodeURIComponent(q.term)}&from_date=${fromStr}&size=15&sort=recent`;
-      try{
-        const res=await fetch(url,{headers:{'Accept':'application/json'}});
-        if(!res.ok) continue;
-        const data=await res.json();
-        if(data.decisions&&data.decisions.length){
-          data.decisions.forEach(d=>{
-            if(seen.has(d.ada))return;
-            // Soft region filter — show if region matches OR if no region selected
-            const textToCheck=((d.subject||'')+(d.organizationLabel||'')+(d.unitLabel||'')).toLowerCase();
-            if(activeRegions.size>0){
-              const matchesRegion=regionTerms.some(rt=>textToCheck.includes(rt.toLowerCase()));
-              // Only skip if we're VERY confident it's unrelated (has another city)
-              const otherCities=['Αθήνα','Θεσσαλονίκη','Πάτρα','Ηράκλειο','Λάρισα','Βόλος'];
-              const hasOtherCity=otherCities.some(c=>textToCheck.includes(c.toLowerCase())&&!matchesRegion);
-              if(hasOtherCity) return;
-            }
-            seen.add(d.ada);
-            allResults.push({...d, matchedKw:q.label});
-          });
-        }
-      }catch(e){/* skip failed queries */}
+      // Ψάχνουμε και χωρίς φίλτρο τύπου και με φίλτρο για διαγωνισμούς
+      const baseUrl=`https://diavgeia.gov.gr/luminapi/api/search?q=${encodeURIComponent(q.term)}&from_date=${fromStr}&size=20&sort=recent`;
+      const tenderUrl=`https://diavgeia.gov.gr/luminapi/api/search?q=${encodeURIComponent(q.term)}&from_date=${fromStr}&size=20&sort=recent&fq=decisionType:(%22%CE%94.2.1%22%20OR%20%22%CE%94.2.2%22%20OR%20%22%CE%94.3.3%22)`;
+      
+      for(const url of [baseUrl, tenderUrl]){
+        try{
+          const res=await fetch(url,{headers:{'Accept':'application/json'}});
+          if(!res.ok) continue;
+          const data=await res.json();
+          if(data.decisions&&data.decisions.length){
+            data.decisions.forEach(d=>{
+              if(seen.has(d.ada))return;
+              const textToCheck=((d.subject||'')+(d.organizationLabel||'')+(d.unitLabel||'')).toLowerCase();
+              if(activeRegions.size>0){
+                const matchesRegion=regionTerms.some(rt=>textToCheck.includes(rt.toLowerCase()));
+                const otherCities=['αθήνα','θεσσαλονίκη','πάτρα','ηράκλειο','λάρισα','βόλος','ιωάννινα','χανιά','ρόδος','κέρκυρα','καβάλα','σέρρες'];
+                const hasOtherCity=otherCities.some(c=>textToCheck.includes(c)&&!matchesRegion);
+                if(hasOtherCity) return;
+              }
+              seen.add(d.ada);
+              allResults.push({...d, matchedKw:q.label});
+            });
+          }
+        }catch(e){/* skip failed query */}
       }
     }
 
     // Sort by date desc
     allResults.sort((a,b)=>(b.issueDate||'').localeCompare(a.issueDate||''));
-
     renderResults(allResults, days);
   } catch(e){
     area.innerHTML=`<div class="error-box">❌ Σφάλμα σύνδεσης με τη Διαύγεια. Δοκίμασε ξανά.</div>`;
