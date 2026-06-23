@@ -223,13 +223,16 @@ async function doSearch(){
 
   try {
     for(const q of queries){
-      // Ψάχνουμε και χωρίς φίλτρο τύπου και με φίλτρο για διαγωνισμούς
-      const baseUrl=`https://diavgeia.gov.gr/luminapi/api/search?q=${encodeURIComponent(q.term)}&from_date=${fromStr}&size=20&sort=recent`;
-      const tenderUrl=`https://diavgeia.gov.gr/luminapi/api/search?q=${encodeURIComponent(q.term)}&from_date=${fromStr}&size=20&sort=recent&fq=decisionType:(%22%CE%94.2.1%22%20OR%20%22%CE%94.2.2%22%20OR%20%22%CE%94.3.3%22)`;
-      
-      for(const url of [baseUrl, tenderUrl]){
+      // Wrap multi-word queries in quotes for correct API syntax
+      const qEncoded = q.term.includes(' ')
+        ? encodeURIComponent(`"${q.term}"`)
+        : encodeURIComponent(q.term);
+      const url=`https://diavgeia.gov.gr/luminapi/api/search?q=${qEncoded}&from_date=${fromStr}&size=20&sort=recent`;
+      const tenderUrl=`https://diavgeia.gov.gr/luminapi/api/search?q=${qEncoded}&from_date=${fromStr}&size=20&sort=recent&fq=decisionType:(%22%CE%94.2.1%22%20OR%20%22%CE%94.2.2%22%20OR%20%22%CE%94.3.3%22)`;
+
+      for(const url2 of [url, tenderUrl]){
         try{
-          const res=await fetch(url,{headers:{'Accept':'application/json'}});
+          const res=await fetch(url2,{headers:{'Accept':'application/json'}});
           if(!res.ok) continue;
           const data=await res.json();
           if(data.decisions&&data.decisions.length){
