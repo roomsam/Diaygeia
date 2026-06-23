@@ -189,6 +189,7 @@ async function doSearch(){
     if(kw) kwTerms.push(...kw.terms);
   });
 
+  // Build region terms for query
   const regionTerms=[];
   activeRegions.forEach(id=>{
     const r=REGIONS.find(r=>r.id===id);
@@ -199,35 +200,47 @@ async function doSearch(){
   const allResults=[];
   const seen=new Set();
 
-  // Query per keyword (top 3 terms each)
+  // Query: keyword + region combined in the search string
   const queries=[];
   activeKeywords.forEach(id=>{
     const kw=KEYWORDS.find(k=>k.id===id);
-    if(kw) queries.push({label:kw.label, terms:kw.terms.slice(0,2)});
+    if(!kw) return;
+    // Search keyword alone (no strict region filter - Diavgeia has org info separately)
+    kw.terms.slice(0,2).forEach(term=>{
+      queries.push({label:kw.label, term});
+    });
+    // Also search keyword + region combined
+    if(regionTerms.length>0){
+      regionTerms.slice(0,2).forEach(rt=>{
+        queries.push({label:kw.label, term:`${kw.terms[0]} ${rt}`});
+      });
+    }
   });
 
   try {
     for(const q of queries){
-      for(const term of q.terms){
-        const url=`https://diavgeia.gov.gr/luminapi/api/search?q=${encodeURIComponent(term)}&from_date=${fromStr}&size=20&sort=recent`;
-        try{
-          const res=await fetch(url,{headers:{'Accept':'application/json'}});
-          if(!res.ok) continue;
-          const data=await res.json();
-          if(data.decisions&&data.decisions.length){
-            data.decisions.forEach(d=>{
-              if(seen.has(d.ada))return;
-              // Region filter
-              const textToCheck=(d.subject||'')+(d.organizationLabel||'')+(d.unitLabel||'');
-              if(activeRegions.size>0){
-                const matchesRegion=regionTerms.some(rt=>textToCheck.toLowerCase().includes(rt.toLowerCase()));
-                if(!matchesRegion) return;
-              }
-              seen.add(d.ada);
-              allResults.push({...d, matchedKw:q.label});
-            });
-          }
-        }catch(e){/* skip failed queries */}
+      const url=`https://diavgeia.gov.gr/luminapi/api/search?q=${encodeURIComponent(q.term)}&from_date=${fromStr}&size=15&sort=recent`;
+      try{
+        const res=await fetch(url,{headers:{'Accept':'application/json'}});
+        if(!res.ok) continue;
+        const data=await res.json();
+        if(data.decisions&&data.decisions.length){
+          data.decisions.forEach(d=>{
+            if(seen.has(d.ada))return;
+            // Soft region filter — show if region matches OR if no region selected
+            const textToCheck=((d.subject||'')+(d.organizationLabel||'')+(d.unitLabel||'')).toLowerCase();
+            if(activeRegions.size>0){
+              const matchesRegion=regionTerms.some(rt=>textToCheck.includes(rt.toLowerCase()));
+              // Only skip if we're VERY confident it's unrelated (has another city)
+              const otherCities=['Αθήνα','Θεσσαλονίκη','Πάτρα','Ηράκλειο','Λάρισα','Βόλος'];
+              const hasOtherCity=otherCities.some(c=>textToCheck.includes(c.toLowerCase())&&!matchesRegion);
+              if(hasOtherCity) return;
+            }
+            seen.add(d.ada);
+            allResults.push({...d, matchedKw:q.label});
+          });
+        }
+      }catch(e){/* skip failed queries */}
       }
     }
 
